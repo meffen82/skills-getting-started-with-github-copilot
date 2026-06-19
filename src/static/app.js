@@ -20,12 +20,48 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
+        const participantsList = details.participants.length > 0
+          ? details.participants.map(email => `<li>${email} <button class="delete-btn" data-activity="${name}" data-email="${email}" title="Remove participant">✕</button></li>`).join('')
+          : '<li class="no-participants">No participants yet</li>';
+
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <div class="participants-section">
+            <strong>Signed Up:</strong>
+            <ul class="participants-list">
+              ${participantsList}
+            </ul>
+          </div>
         `;
+
+        // Add delete handlers
+        const deleteButtons = activityCard.querySelectorAll('.delete-btn');
+        deleteButtons.forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const activityName = btn.dataset.activity;
+            const email = btn.dataset.email;
+            try {
+              const response = await fetch(
+                `/activities/${encodeURIComponent(activityName)}/remove?email=${encodeURIComponent(email)}`,
+                { method: 'DELETE' }
+              );
+              if (response.ok) {
+                // Refresh activities list
+                fetchActivities();
+              } else {
+                const error = await response.json();
+                alert(error.detail || 'Failed to remove participant');
+              }
+            } catch (error) {
+              console.error('Error removing participant:', error);
+              alert('Failed to remove participant');
+            }
+          });
+        });
 
         activitiesList.appendChild(activityCard);
 
@@ -40,6 +76,9 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Error fetching activities:", error);
     }
   }
+
+  // Refresh the activities list after a change
+  window.refreshActivities = fetchActivities;
 
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
@@ -62,6 +101,8 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        // Refresh activities list to show updated participant count
+        fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
